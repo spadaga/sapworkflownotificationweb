@@ -140,7 +140,7 @@
             result.innerHTML = '<div class="status info">Sending workflow notification to Teams...</div>';
             
             try {
-                const response = await fetch('/api/trigger-workflow', {
+                const response = await fetch('/api/trigger', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ instanceId: instanceId })
