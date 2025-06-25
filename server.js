@@ -1,4 +1,5 @@
-const http = require('http');
+import http from 'http';
+
 const port = process.env.PORT || 8080;
 
 http.createServer((req, res) => {
