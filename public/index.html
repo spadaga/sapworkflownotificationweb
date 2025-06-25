@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SAP Workflow Notification</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+        }
+        .status {
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .info { background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        .warning { background-color: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+        .btn {
+            background-color: #007bff;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        .btn:hover {
+            background-color: #0056b3;
+        }
+        .endpoint {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-left: 4px solid #007bff;
+            margin: 10px 0;
+            font-family: monospace;
+        }
+        .input-group {
+            margin: 15px 0;
+        }
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .input-group input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 14px;
+        }
+        .workflow-form {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            border: 2px solid #007bff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1> SAP Workflow Notification </h1>
+            <p>Send workflow notifications to Teams with Approve/Reject functionality</p>
+        </div>
+
+        <div class="status success" style="display: none;">
+            <strong>✅ Deployment Status:</strong> Successfully deployed to Vercel
+        </div>
+
+        <div class="status info">
+            <strong>🔗 Available Endpoints:</strong>
+            <div class="endpoint">POST /api/trigger-workflow - Send workflow notification to Teams</div>
+            <div class="endpoint">POST /api/teams-action - Handle approve/reject actions from Teams</div>
+        </div>
+
+        <div class="status info">
+            <strong>🎯 How it works:</strong>
+            <ul>
+                <li><strong>Trigger:</strong> App sends notification to Teams with Approve/Reject buttons</li>
+                <li><strong>Actions:</strong> Teams sends approve/reject to Vercel, which calls SAP API</li>
+                <li><strong>Logging:</strong> Detailed step-by-step logging for troubleshooting</li>
+            </ul>
+        </div>
+
+        <div class="status warning">
+            <strong>⚙️ Environment Variables Required:</strong>
+            <ul>
+                <li>TEAMS_WEBHOOK_URL - Your Teams webhook URL</li>
+                <li>SAP_CLIENT_ID - SAP OAuth client ID</li>
+                <li>SAP_CLIENT_SECRET - SAP OAuth client secret</li>
+                <li>INBOX_URL - SAP inbox URL</li>
+            </ul>
+        </div>
+
+        <div class="workflow-form">
+            <h3>📧 Send Workflow Notification</h3>
+            
+            <div class="input-group">
+                <label for="instanceId">Instance ID:</label>
+                <input type="text" id="instanceId" value="000000063553" placeholder="Enter SAP instance ID">
+            </div>
+
+            <div style="text-align: center; margin-top: 20px;">
+                <button class="btn" onclick="sendNotification()">📤 Send Notification to Teams</button>
+            </div>
+        </div>
+
+        <div id="result" style="margin-top: 20px;"></div>
+    </div>
+
+    <script>
+        async function sendNotification() {
+            const result = document.getElementById('result');
+            const instanceId = document.getElementById('instanceId').value;
+            
+            if (!instanceId.trim()) {
+                result.innerHTML = '<div class="status warning"><strong>Error:</strong> Please enter an Instance ID</div>';
+                return;
+            }
+            
+            result.innerHTML = '<div class="status info">Sending workflow notification to Teams...</div>';
+            
+            try {
+                const response = await fetch('/api/trigger-workflow', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ instanceId: instanceId })
+                });
+                const data = await response.json();
+                
+                if (response.ok) {
+                    result.innerHTML = `
+                        <div class="status success">
+                            <strong>✅ Success!</strong> ${data.message}<br>
+                            <strong>Instance ID:</strong> ${data.instanceId}<br>
+                            <strong>Next:</strong> Check Teams for the notification with Approve/Reject buttons
+                        </div>`;
+                } else {
+                    result.innerHTML = `<div class="status warning"><strong>❌ Error:</strong> ${data.message}</div>`;
+                }
+            } catch (error) {
+                result.innerHTML = `<div class="status warning"><strong>❌ Error:</strong> ${error.message}</div>`;
+            }
+        }
+    </script>
+</body>
+</html>

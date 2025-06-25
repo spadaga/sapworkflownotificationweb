@@ -1,0 +1,13 @@
+ 
+node_modules/
+.env*
+*.log
+.vercel
+.env*.local
+.env.production 
+.env
+.env.local
+.env.production
+.env.staging
+node_modules/
+*.md

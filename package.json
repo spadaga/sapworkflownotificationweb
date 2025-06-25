@@ -1,0 +1,16 @@
+{
+  "name": "sap-workflow-poc",
+  "version": "1.0.0",
+  "description": "SAP Workflow Notification POC for Teams",
+  "type": "module",
+  "scripts": {
+    "build": "echo 'No build step required'",
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "axios": "^0.21.4"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

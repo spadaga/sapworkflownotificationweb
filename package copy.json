@@ -1,0 +1,17 @@
+{
+  "name": "sap-workflow-poc",
+  "version": "1.0.0",
+  "description": "SAP Workflow Notification POC for Teams",
+  "type": "module",
+  "scripts": {
+    "dev": "vercel dev",
+    "build": "echo 'No build step required'",
+    "start": "vercel dev"
+  },
+  "dependencies": {
+    "axios": "^0.21.4"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
