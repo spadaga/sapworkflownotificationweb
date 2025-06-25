@@ -1,12 +1,11 @@
-export default async function triggerHandler(req, res, data) {
+export default async function handler(req, res) {
   console.log("🚀 [TRIGGER] Raw request received at", new Date().toISOString());
   console.log("📥 [TRIGGER] Method:", req.method);
   console.log("📥 [TRIGGER] URL:", req.url);
   console.log("📥 [TRIGGER] Headers:", JSON.stringify(req.headers, null, 2));
-  console.log("📋 [TRIGGER] Body:", JSON.stringify(data, null, 2));
+  console.log("📋 [TRIGGER] Body:", JSON.stringify(req.body, null, 2));
   console.log("📥 [TRIGGER] Raw Headers:", Object.entries(req.headers).map(([k, v]) => `${k}: ${v}`).join("\n"));
 
-  // CORS headers
   res.setHeader("Access-Control-Allow-Credentials", true);
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "OPTIONS, POST");
@@ -14,16 +13,13 @@ export default async function triggerHandler(req, res, data) {
 
   if (req.method === "OPTIONS") {
     console.log("✅ [TRIGGER] OPTIONS request handled");
-    res.writeHead(200);
-    res.end();
+    res.status(200).end();
     return;
   }
 
   if (req.method !== "POST") {
     console.error("❌ [TRIGGER] Method not allowed:", req.method);
-    res.writeHead(405, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: "Method not allowed, use POST" }));
-    return;
+    return res.status(405).json({ error: "Method not allowed, use POST" });
   }
 
   try {
@@ -35,21 +31,19 @@ export default async function triggerHandler(req, res, data) {
 
     if (!botAppId || !botAppPassword || !conversationId) {
       console.error("❌ [TRIGGER] Missing required env vars");
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: "Missing bot configuration" }));
-      return;
+      return res.status(500).json({ error: "Missing bot configuration" });
     }
 
-    const instanceId = data.instanceId || "000000063553";
+    const instanceId = req.body?.instanceId || "000000063553";
     console.log("🎯 [TRIGGER] Using instanceId:", instanceId);
 
     const workflowData = {
-      TASK_TITLE: data.taskTitle || "Verify General Journal Entry 100000155 GMM1 2025",
-      Status: data.status || "READY",
+      TASK_TITLE: req.body?.taskTitle || "Verify General Journal Entry 100000155 GMM1 2025",
+      Status: req.body?.status || "READY",
       INST_ID: instanceId,
-      TASKDETAILS: data.taskDetails || " #$# Document Type : G/L Account Document #$# Company Code : GM Manufacturing #$# Amount : 1.700,00 USD",
-      CREATED_BY_NAME: data.createdByName || "Ayush Agrawal",
-      CREATED_ON: data.createdOn || new Date().toISOString(),
+      TASKDETAILS: req.body?.taskDetails || " #$# Document Type : G/L Account Document #$# Company Code : GM Manufacturing #$# Amount : 1.700,00 USD",
+      CREATED_BY_NAME: req.body?.createdByName || "Ayush Agrawal",
+      CREATED_ON: req.body?.createdOn || new Date().toISOString(),
       INBOXURL: inboxUrl || "https://yawss4hsbx.sapyash.com:44301/sap/bc/ui2/flp?sap-client=100&sap-language=EN#WorkflowTask-displayInbox",
     };
 
@@ -72,16 +66,14 @@ export default async function triggerHandler(req, res, data) {
     );
 
     console.log("✅ [TRIGGER] Bot response:", botResponse.status, botResponse.data);
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({
+    res.status(200).json({
       message: `Success! Workflow notification sent with ${adaptiveCardJson.attachments?.[0]?.content?.actions?.length || 0} actions`,
       instanceId,
       actionsCount: adaptiveCardJson.attachments?.[0]?.content?.actions?.length || 0,
-    }));
+    });
   } catch (error) {
     console.error("💥 [TRIGGER] Error:", error.message, error.response?.data);
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: "Failed to send workflow notification", details: error.message }));
+    res.status(500).json({ error: "Failed to send workflow notification", details: error.message });
   }
 }
 
