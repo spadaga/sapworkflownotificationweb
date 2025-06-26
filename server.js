@@ -2,8 +2,18 @@ import http from 'http';
 import { default as triggerHandler } from './api/trigger.js';
 import { readFile } from 'fs/promises';
 import { join } from 'path';
+import dotenv from 'dotenv';
 
-const port = process.env.PORT || 8080;
+
+if (process.env.NODE_ENV === undefined) {
+    console.log("environment:",process.env.NODE_ENV)
+  dotenv.config({ path: '.env.local' });
+}
+else{
+     console.log("environment:",process.env.NODE_ENV)
+}
+
+const port = process.env.PORT || 3000;
 const publicDir = join(process.cwd(), 'public');
 
 http.createServer(async (req, res) => {
