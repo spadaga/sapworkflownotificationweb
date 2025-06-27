@@ -43,15 +43,25 @@ export default async function triggerHandler(req, res, data) {
     const instanceId = data.instanceId || "000000063553";
     console.log("🎯 [TRIGGER] Using instanceId:", instanceId);
 
-    const workflowData = {
-      TASK_TITLE: data.taskTitle || "Verify General Journal Entry 100000155 GMM1 2025",
-      Status: data.status || "READY",
+    // Use real-time JSON for non-alert conditions, show only existing values
+    const workflowData = data.NOTIFTYPE !== "Alert" ? {
+      TASK_TITLE: data.TaskTitle,
+      Status: data.Status,
+      INST_ID: data.InstanceID,
+      TASKDETAILS: data.TaskDetails,
+      CREATED_BY_NAME: data.CreatedByName,
+      CREATED_ON: data.CreatedOn,
+      INBOXURL: data.InboxURL,
+      APPURL: data.AppURL,
+    } : {
+      TASK_TITLE: data.TASK_TITLE,
+      Status: data.status,
       INST_ID: instanceId,
-      TASKDETAILS: data.taskDetails || " #$# Document Type : G/L Account Document #$# Company Code : GM Manufacturing #$# Amount : 1.700,00 USD",
-      CREATED_BY_NAME: data.createdByName || "Ayush Agrawal",
-      CREATED_ON: data.createdOn || new Date().toISOString(),
-      INBOXURL: inboxUrl || "https://yawss4hsbx.sapyash.com:44301/sap/bc/ui2/flp?sap-client=100&sap-language=EN#WorkflowTask-displayInbox",
-      APPURL: data.AppURL || "",
+      TASKDETAILS: data.TASKDETAILS,
+      CREATED_BY_NAME: data.createdByName,
+      CREATED_ON: data.createdOn,
+      INBOXURL: inboxUrl,
+      APPURL: data.AppURL,
     };
 
     console.log("📋 [TRIGGER] Workflow data:", JSON.stringify(workflowData, null, 2));
@@ -60,42 +70,69 @@ export default async function triggerHandler(req, res, data) {
     let adaptiveCardJson;
 
     if (data.NOTIFTYPE === "Alert") {
-      // Alert card with same UI as workflow notification
+      // Alert content with only existing JSON fields, excluding Instance ID
       const alertData = {
-        TaskTitle: data.TASK_TITLE || "Alert Notification",
-        UID: data.UID || "Unknown User",
+        TaskTitle: data.TASK_TITLE || "",
+        UID: data.UID || "",
         TaskDetails: data.TASKDETAILS || "",
         ACTIONBUTTONS: data.ACTIONBUTTONS || "",
-        InstanceID: instanceId,
-        CreatedOn: new Date().toISOString(),
+        CreatedOn: data.createdOn || "",
       };
 
-      console.log("📋 [TRIGGER] Alert data:", JSON.stringify(alertData, null, 2)); // Debug log for alert data
+      console.log("📋 [TRIGGER] Alert data:", JSON.stringify(alertData, null, 2));
+      
       const details = alertData.TaskDetails
         ? alertData.TaskDetails.match(/[^#$]+/g)?.map(m => m.trim()) || []
         : [];
-      const [actionButton] = alertData.ACTIONBUTTONS ? alertData.ACTIONBUTTONS.match(/https?:\/\/[^\s]+/) || ["#"] : ["#"];
 
-      const formattedDate = new Date(alertData.CreatedOn).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" }) || "N/A";
+      // Fixed URL extraction logic
+      let actionButtonLabel = "";
+      let actionButtonUrl = "";
+      
+      if (alertData.ACTIONBUTTONS && alertData.ACTIONBUTTONS.trim()) {
+        console.log("📋 [TRIGGER] Processing ACTIONBUTTONS:", alertData.ACTIONBUTTONS);
+        
+        // Split by #$# and find the action button entry
+        const actionParts = alertData.ACTIONBUTTONS.split('#$#').map(part => part.trim()).filter(part => part);
+        
+        for (const part of actionParts) {
+          if (part.includes(':')) {
+            const colonIndex = part.indexOf(':');
+            const label = part.substring(0, colonIndex).trim();
+            let url = part.substring(colonIndex + 1).trim();
+            
+            // Check if this looks like a URL (contains http)
+            if (url.includes('http')) {
+              actionButtonLabel = label;
+              // Clean up the URL - remove quotes and extra spaces
+              actionButtonUrl = url.replace(/^['"\s]+|['"\s]+$/g, '');
+              break;
+            }
+          }
+        }
+      }
 
-      // Map details to icons based on label
+      console.log("📋 [TRIGGER] Extracted actionButtonLabel:", actionButtonLabel);
+      console.log("📋 [TRIGGER] Extracted actionButtonUrl:", actionButtonUrl);
+
+      const formattedDate = alertData.CreatedOn ? new Date(alertData.CreatedOn).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" }) : "";
+
+      // Map details to text with bold labels to match image style
       const detailItems = details.map(detail => {
         const [label, value] = detail.split(':').map(s => s.trim());
         if (!value) return null; // Skip if no value
-        const iconMap = {
-          "Current Stock": "📦",
-          "Ordered Quantity": "📦",
-          "Purchase Order Date": "📅",
-          "Delivery Date": "📅",
-          "Plant": "🏭",
-          "Material": "📋",
-          "Safety Stock": "📊",
-          "Shortfall": "⚠️",
-          "Date": "📅"
-        };
-        const icon = iconMap[label] || "📄"; // Default to 📄 if no specific icon
-        return { type: "TextBlock", text: `${icon} **${label}:** ${value}`, size: "small", spacing: "small", wrap: true };
+        return { type: "TextBlock", text: `**${label}:** ${value}`, size: "small", spacing: "small", wrap: true };
       }).filter(item => item !== null);
+
+      // Create actions array - only include button if URL exists
+      const actions = [];
+      if (actionButtonUrl) {
+        actions.push({
+          type: "Action.OpenUrl",
+          title: "🔗 " + actionButtonLabel || "🔗 Open Purchase Order",
+          url: actionButtonUrl
+        });
+      }
 
       adaptiveCardJson = {
         type: "message",
@@ -106,28 +143,27 @@ export default async function triggerHandler(req, res, data) {
             $schema: "http://adaptivecards.io/schemas/adaptive-card.json",
             version: "1.3",
             body: [
-              { type: "TextBlock", text: "🔔 **Alert Notification**", weight: "bolder", size: "large", color: "accent" },
+              { type: "TextBlock", text: "‼️ **High Alert Notification**", weight: "bolder", size: "large", color: "accent" },
               { type: "TextBlock", text: alertData.TaskTitle, weight: "bolder", size: "medium", wrap: true, spacing: "medium" },
               {
                 type: "Container",
                 items: [
-                  { type: "ColumnSet", columns: [{ type: "Column", width: "auto", items: [{ type: "TextBlock", text: "**Instance ID:**", size: "small" }] }, { type: "Column", width: "stretch", items: [{ type: "TextBlock", text: alertData.InstanceID, size: "small" }] }] },
-                  { type: "ColumnSet", columns: [{ type: "Column", width: "auto", items: [{ type: "TextBlock", text: "**Created By:**", size: "small" }] }, { type: "Column", width: "stretch", items: [{ type: "TextBlock", text: alertData.UID, size: "small" }] }] },
-                  { type: "ColumnSet", columns: [{ type: "Column", width: "auto", items: [{ type: "TextBlock", text: "**Created On:**", size: "small" }] }, { type: "Column", width: "stretch", items: [{ type: "TextBlock", text: formattedDate, size: "small" }] }] },
-                ],
+                  alertData.UID ? { type: "ColumnSet", columns: [{ type: "Column", width: "auto", items: [{ type: "TextBlock", text: "UID:", size: "small" }] }, { type: "Column", width: "stretch", items: [{ type: "TextBlock", text: alertData.UID, size: "small" }] }] } : null,
+                  alertData.CreatedOn ? { type: "ColumnSet", columns: [{ type: "Column", width: "auto", items: [{ type: "TextBlock", text: "Created On:", size: "small" }] }, { type: "Column", width: "stretch", items: [{ type: "TextBlock", text: formattedDate, size: "small" }] }] } : null,
+                ].filter(item => item !== null),
                 style: "emphasis",
                 spacing: "medium",
               },
               {
                 type: "Container",
                 items: [
-                  { type: "TextBlock", text: "**Task Details:**", weight: "bolder", size: "small", spacing: "medium" },
+                  { type: "TextBlock", text: "Task Details:", weight: "bolder", size: "small", spacing: "medium" },
                   ...detailItems,
                 ],
                 spacing: "medium",
               },
-            ],
-            actions: actionButton !== "#" ? [{ type: "Action.OpenUrl", title: "👁 Open Purchase Order", url: actionButton }] : [],
+            ].filter(item => item !== null),
+            actions: actions,
           }
         }]
       };
@@ -190,14 +226,15 @@ function createTeamsInlineCard(workflow, isLiveData = true) {
   try {
     const safeWorkflow = isLiveData
       ? {
-          TaskTitle: workflow.TASK_TITLE || "Untitled Task",
-          Status: workflow.Status || "READY",
-          InstanceID: workflow.INST_ID || "N/A",
-          TaskDetails: workflow.TASKDETAILS || "",
-          CreatedByName: workflow.CREATED_BY_NAME || "Unknown",
-          CreatedOn: workflow.CREATED_ON || new Date().toISOString(),
-          InboxURL: workflow.INBOXURL || "#",
-          AppURL: workflow.APPURL || "#",
+          TaskTitle: workflow.TASK_TITLE,
+          Status: workflow.Status,
+          InstanceID: workflow.INST_ID,
+          TaskDetails: workflow.TASKDETAILS,
+          CreatedByName: workflow.CREATED_BY_NAME,
+          CreatedOn: workflow.CREATED_ON,
+          InboxURL: workflow.INBOXURL,
+          AppURL: workflow.APPURL,
+          CreatedBy: workflow.CreatedBy // Including additional JSON field
         }
       : {
           TaskTitle: workflow.TaskTitle || "Untitled Task",
@@ -210,55 +247,76 @@ function createTeamsInlineCard(workflow, isLiveData = true) {
           AppURL: workflow.AppURL || "#",
         };
 
-    const [documentType, companyCode, amount] = safeWorkflow.TaskDetails
-      ? safeWorkflow.TaskDetails.match(/Document Type\s*:\s*([^#$]+)|Company Code\s*:\s*([^#$]+)|Amount\s*:\s*([^#$]+)/)?.slice(1).map(m => m?.trim()) || []
+    // Parse all TaskDetails fields
+    const taskDetailsArray = safeWorkflow.TaskDetails
+      ? safeWorkflow.TaskDetails.match(/[^#$]+/g)?.map(m => m.trim()) || []
       : [];
-    const detailItems = [
-      documentType ? { type: "TextBlock", text: `📄 **Document Type:** ${documentType}`, size: "small", spacing: "small", wrap: true } : null,
-      companyCode ? { type: "TextBlock", text: `🏢 **Company Code:** ${companyCode}`, size: "small", spacing: "small", wrap: true } : null,
-      amount ? { type: "TextBlock", text: `💰 **Amount:** ${amount}`, size: "small", spacing: "small", wrap: true } : null,
-    ].filter(item => item !== null);
+    const detailItems = taskDetailsArray.map(detail => {
+      const [label, value] = detail.split(':').map(s => s.trim());
+      if (!value) return null; // Skip if no value
+      return { type: "TextBlock", text: `${label}: ${value}`, size: "small", spacing: "small", wrap: true };
+    }).filter(item => item !== null);
 
-    const formattedDate = new Date(safeWorkflow.CreatedOn).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" }) || "N/A";
+    const formattedDate = safeWorkflow.CreatedOn ? new Date(safeWorkflow.CreatedOn).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" }) : "";
 
     const cardContent = {
       type: "AdaptiveCard",
       $schema: "http://adaptivecards.io/schemas/adaptive-card.json",
       version: "1.3",
       body: [
-        { type: "TextBlock", text: "🔔 **New Workflow Notification**", weight: "bolder", size: "large", color: "accent" },
-        { type: "TextBlock", text: safeWorkflow.TaskTitle, weight: "bolder", size: "medium", wrap: "true", spacing: "medium" },
+        // Updated header with notification icon
+        { 
+          type: "TextBlock", 
+          text: "🔔 **New Workflow Notification**", 
+          weight: "bolder", 
+          size: "large", 
+          color: "accent" 
+        },
+        { type: "TextBlock", text: safeWorkflow.TaskTitle || "", weight: "bolder", size: "medium", wrap: "true", spacing: "medium" },
         {
           type: "Container",
           items: [
-            { type: "ColumnSet", columns: [{ type: "Column", width: "auto", items: [{ type: "TextBlock", text: "**Instance ID:**", size: "small" }] }, { type: "Column", width: "stretch", items: [{ type: "TextBlock", text: safeWorkflow.InstanceID, size: "small" }] }] },
-            { type: "ColumnSet", columns: [{ type: "Column", width: "auto", items: [{ type: "TextBlock", text: "**Created By:**", size: "small" }] }, { type: "Column", width: "stretch", items: [{ type: "TextBlock", text: safeWorkflow.CreatedByName, size: "small" }] }] },
-            { type: "ColumnSet", columns: [{ type: "Column", width: "auto", items: [{ type: "TextBlock", text: "**Created On:**", size: "small" }] }, { type: "Column", width: "stretch", items: [{ type: "TextBlock", text: formattedDate, size: "small" }] }] },
-          ],
+            safeWorkflow.InstanceID ? { type: "ColumnSet", columns: [{ type: "Column", width: "auto", items: [{ type: "TextBlock", text: "Instance ID:", size: "small" }] }, { type: "Column", width: "stretch", items: [{ type: "TextBlock", text: safeWorkflow.InstanceID, size: "small" }] }] } : null,
+            safeWorkflow.CreatedByName ? { type: "ColumnSet", columns: [{ type: "Column", width: "auto", items: [{ type: "TextBlock", text: "Created By:", size: "small" }] }, { type: "Column", width: "stretch", items: [{ type: "TextBlock", text: safeWorkflow.CreatedByName, size: "small" }] }] } : null,
+            safeWorkflow.CreatedOn ? { type: "ColumnSet", columns: [{ type: "Column", width: "auto", items: [{ type: "TextBlock", text: "Created On:", size: "small" }] }, { type: "Column", width: "stretch", items: [{ type: "TextBlock", text: formattedDate, size: "small" }] }] } : null,
+          ].filter(item => item !== null),
           style: "emphasis",
           spacing: "medium",
         },
         {
           type: "Container",
           items: [
-            { type: "TextBlock", text: "**Task Details:**", weight: "bolder", size: "small", spacing: "medium" },
+            { type: "TextBlock", text: "Task Details:", weight: "bolder", size: "small", spacing: "medium" },
             ...detailItems,
           ],
           spacing: "medium",
         },
-      ],
+      ].filter(item => item !== null),
       actions: [
-        { type: "Action.Submit", title: "✅ Approve", data: { action: "approve", instanceId: safeWorkflow.InstanceID }, style: "positive" },
-        { type: "Action.Submit", title: "❌ Reject", data: { action: "reject", instanceId: safeWorkflow.InstanceID }, style: "destructive" },
-        ...(safeWorkflow.InboxURL !== "#" && safeWorkflow.AppURL !== "#" ? [
-          { type: "Action.OpenUrl", title: "👁 View in SAP Inbox", url: safeWorkflow.InboxURL },
-          { type: "Action.OpenUrl", title: "📲 Open App URL", url: safeWorkflow.AppURL }
-        ] : safeWorkflow.InboxURL !== "#" ? [
-          { type: "Action.OpenUrl", title: "👁 View in SAP Inbox", url: safeWorkflow.InboxURL }
-        ] : safeWorkflow.AppURL !== "#" ? [
-          { type: "Action.OpenUrl", title: "📲 Open App URL", url: safeWorkflow.AppURL }
-        ] : [])
-      ],
+        // Updated actions with icons
+        { 
+          type: "Action.Submit", 
+          title: "✅ Approve", 
+          data: { action: "approve", instanceId: safeWorkflow.InstanceID }, 
+          style: "positive" 
+        },
+        { 
+          type: "Action.Submit", 
+          title: "❌ Reject", 
+          data: { action: "reject", instanceId: safeWorkflow.InstanceID }, 
+          style: "destructive" 
+        },
+        ...(safeWorkflow.InboxURL ? [{ 
+          type: "Action.OpenUrl", 
+          title: "🔗 View in SAP Inbox", 
+          url: safeWorkflow.InboxURL 
+        }] : []),
+        ...(safeWorkflow.AppURL ? [{ 
+          type: "Action.OpenUrl", 
+          title: "🔗 Open App URL", 
+          url: safeWorkflow.AppURL 
+        }] : []),
+      ].filter(action => action !== null),
     };
 
     return { type: "message", attachments: [{ contentType: "application/vnd.microsoft.card.adaptive", content: cardContent }] };
