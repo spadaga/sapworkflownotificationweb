@@ -1,3 +1,53 @@
+----------------------------dEV-------------------
+D:\SAP BOT AND WORKFLOWS\sap-workflow-notification>npm start
+
+http://localhost:3000/api/trigger
+
+{
+  "instanceId": "000000063553",
+  "NOTIFTYPE": "Alert",
+  "TASK_TITLE": "Delivery of Material Remazol Black B 133% (FG1-1275) from vendor XYZ for plant 1275 against PO 7100000001 is delayed",
+  "UID": "arihant.jain@yash.com",
+  "TASKDETAILS": " #$# Current Stock : 0 #$# Ordered Quantity : 75 KG #$# Purchase Order Date : 29.05.2025 #$# Delivery Date : 02.06.2025",
+  "ACTIONBUTTONS": " #$# Open Purchase Order : https://yawss4hsbx.sapyash.com:44301/sap/bc/ui2/flp?sap-client=100&sap-language=EN '#PurchaseOrder-manage&/C_PurchaseOrderTP(PurchaseOrder='7100000001',DraftUUID=guid'00000000-0000-0000-0000-000000000000',IsActiveEntity=true)"
+}
+---------------------PROD-----------------------------------
+
+https://sapworkflownotificationweb-app-grbcetfbanh8bkhk.southeastasia-01.azurewebsites.net/api/trigger
+
+use: yash azure suresh login.
+
+
+D:\SAP BOT AND WORKFLOWS\sap-workflow-notification>git add .
+D:\SAP BOT AND WORKFLOWS\sap-workflow-notification>git commit -m "azure push"
+D:\SAP BOT AND WORKFLOWS\sap-workflow-notification>git push origin main --force
+
+
+satya [ ~ ]$ mkdir sapworkflownotificationweb
+satya [ ~ ]$ cd sapworkflownotificationweb
+satya [ ~/sapworkflownotificationweb ]$ git clone https://github.com/spadaga/sapworkflownotificationweb.git sapworkflownotificationweb
+satya [ ~/sapworkflownotificationweb ]$ cd sapworkflownotificationweb
+satya [ ~/sapworkflownotificationweb/sapworkflownotificationweb ]$ zip -r app-deploy.zip . -x "node_modules/*" ".git/*" "*.zip"
+satya [ ~/sapworkflownotificationweb/sapworkflownotificationweb ]$ az webapp deploy \
+  --resource-group sapworkflownotificationweb-rg \
+  --name sapworkflownotificationweb-app \
+  --src-path app-deploy.zip \
+  --type zip
+
+  ---------------------------------------INCREMENTAL INCASE-----------------------------------------
+  satya [ ~/sapworkflownotificationweb/sapworkflownotificationweb ]$  ls -la
+satya [ ~/sapworkflownotificationweb/sapworkflownotificationweb ]$ git pull origin main
+satya [ ~/sapworkflownotificationweb/sapworkflownotificationweb ]$ zip -r app-deploy.zip . -x "node_modules/*" ".git/*" "*.zip
+
+satya [ ~/sapworkflownotificationweb/sapworkflownotificationweb ]$ az webapp deploy \
+  --resource-group sapworkflownotificationweb-rg \
+  --name sapworkflownotificationweb-app \
+  --src-path app-deploy.zip \
+  --type zip
+  ------------------------------------------------------------------------------------------------------
+
+
+
 Your Cloud Shell session will be ephemeral so no files or system changes will persist beyond your current session.
 satya [ ~ ]$ mkdir sapworkflownotificationweb
 satya [ ~ ]$ cd sapworkflownotificationweb

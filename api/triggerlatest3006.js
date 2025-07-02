@@ -45,16 +45,14 @@ export default async function triggerHandler(req, res, data) {
 
     // Use real-time JSON for non-alert conditions, show only existing values
     const workflowData = data.NOTIFTYPE !== "Alert" ? {
-      TASK_TITLE: data.TASK_TITLE,
+      TASK_TITLE: data.TaskTitle,
       Status: data.Status,
-      INST_ID: data.INST_ID,
-      TASKDETAILS: data.TASKDETAILS,
-      CREATED_BY_NAME: data.CREATED_BY_NAME,
-      CREATED_ON: data.CREATED_ON,
-      INBOXURL: data.INBOXURL,
-      APPURL: data.APPURL,
-      CREATED_BY: data.CREATED_BY,
-      UID: data.UID
+      INST_ID: data.InstanceID,
+      TASKDETAILS: data.TaskDetails,
+      CREATED_BY_NAME: data.CreatedByName,
+      CREATED_ON: data.CreatedOn,
+      INBOXURL: data.InboxURL,
+      APPURL: data.AppURL,
     } : {
       TASK_TITLE: data.TASK_TITLE,
       Status: data.status,
@@ -170,7 +168,7 @@ export default async function triggerHandler(req, res, data) {
         }]
       };
     } else {
-      // Non-Alert content with notification icon and button icons
+      // Existing card for non-Alert notifications with Approve, Reject, and dynamic URL buttons
       adaptiveCardJson = createTeamsInlineCard(workflowData, true);
     }
 
@@ -236,8 +234,7 @@ function createTeamsInlineCard(workflow, isLiveData = true) {
           CreatedOn: workflow.CREATED_ON,
           InboxURL: workflow.INBOXURL,
           AppURL: workflow.APPURL,
-          CreatedBy: workflow.CREATED_BY,
-          UID: workflow.UID
+          CreatedBy: workflow.CreatedBy // Including additional JSON field
         }
       : {
           TaskTitle: workflow.TaskTitle || "Untitled Task",
@@ -260,23 +257,7 @@ function createTeamsInlineCard(workflow, isLiveData = true) {
       return { type: "TextBlock", text: `${label}: ${value}`, size: "small", spacing: "small", wrap: true };
     }).filter(item => item !== null);
 
-    // Parse and format the date correctly for DD.MM.YYYY format
-    let formattedDate = "";
-    if (safeWorkflow.CreatedOn) {
-      const [day, month, year] = safeWorkflow.CreatedOn.split('.');
-      if (day && month && year) {
-        // Create a valid ISO date string (YYYY-MM-DD)
-        const isoDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-        const date = new Date(isoDate);
-        formattedDate = date.toLocaleDateString("en-US", { 
-          day: "numeric", 
-          month: "short", 
-          year: "numeric" 
-        });
-      }
-    } else {
-      formattedDate = new Date().toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" });
-    }
+    const formattedDate = safeWorkflow.CreatedOn ? new Date(safeWorkflow.CreatedOn).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" }) : "";
 
     const cardContent = {
       type: "AdaptiveCard",
@@ -296,9 +277,7 @@ function createTeamsInlineCard(workflow, isLiveData = true) {
           type: "Container",
           items: [
             safeWorkflow.InstanceID ? { type: "ColumnSet", columns: [{ type: "Column", width: "auto", items: [{ type: "TextBlock", text: "Instance ID:", size: "small" }] }, { type: "Column", width: "stretch", items: [{ type: "TextBlock", text: safeWorkflow.InstanceID, size: "small" }] }] } : null,
-            safeWorkflow.CreatedByName ? { type: "ColumnSet", columns: [{ type: "Column", width: "auto", items: [{ type: "TextBlock", text: "Created By Name:", size: "small" }] }, { type: "Column", width: "stretch", items: [{ type: "TextBlock", text: safeWorkflow.CreatedByName, size: "small" }] }] } : null,
-            safeWorkflow.CreatedBy ? { type: "ColumnSet", columns: [{ type: "Column", width: "auto", items: [{ type: "TextBlock", text: "Created By:", size: "small" }] }, { type: "Column", width: "stretch", items: [{ type: "TextBlock", text: safeWorkflow.CreatedBy, size: "small" }] }] } : null,
-            safeWorkflow.UID ? { type: "ColumnSet", columns: [{ type: "Column", width: "auto", items: [{ type: "TextBlock", text: "UID:", size: "small" }] }, { type: "Column", width: "stretch", items: [{ type: "TextBlock", text: safeWorkflow.UID, size: "small" }] }] } : null,
+            safeWorkflow.CreatedByName ? { type: "ColumnSet", columns: [{ type: "Column", width: "auto", items: [{ type: "TextBlock", text: "Created By:", size: "small" }] }, { type: "Column", width: "stretch", items: [{ type: "TextBlock", text: safeWorkflow.CreatedByName, size: "small" }] }] } : null,
             safeWorkflow.CreatedOn ? { type: "ColumnSet", columns: [{ type: "Column", width: "auto", items: [{ type: "TextBlock", text: "Created On:", size: "small" }] }, { type: "Column", width: "stretch", items: [{ type: "TextBlock", text: formattedDate, size: "small" }] }] } : null,
           ].filter(item => item !== null),
           style: "emphasis",
