@@ -43,7 +43,7 @@ export default async function triggerHandler(req, res, data) {
     const instanceId = data.instanceId || "000000063553";
     console.log("🎯 [TRIGGER] Using instanceId:", instanceId);
 
-    // Use real-time JSON for non-alert conditions, show only existing values, removed CREATED_BY and UID
+    // Use real-time JSON for non-alert conditions, show only existing values
     const workflowData = data.NOTIFTYPE !== "Alert" ? {
       TASK_TITLE: data.TASK_TITLE,
       Status: data.Status,
@@ -52,7 +52,9 @@ export default async function triggerHandler(req, res, data) {
       CREATED_BY_NAME: data.CREATED_BY_NAME,
       CREATED_ON: data.CREATED_ON,
       INBOXURL: data.INBOXURL,
-      APPURL: data.APPURL
+      APPURL: data.APPURL,
+      CREATED_BY: data.CREATED_BY,
+      UID: data.UID
     } : {
       TASK_TITLE: data.TASK_TITLE,
       Status: data.status,
@@ -61,7 +63,7 @@ export default async function triggerHandler(req, res, data) {
       CREATED_BY_NAME: data.createdByName,
       CREATED_ON: data.createdOn,
       INBOXURL: inboxUrl,
-      APPURL: data.AppURL
+      APPURL: data.AppURL,
     };
 
     console.log("📋 [TRIGGER] Workflow data:", JSON.stringify(workflowData, null, 2));
@@ -70,12 +72,13 @@ export default async function triggerHandler(req, res, data) {
     let adaptiveCardJson;
 
     if (data.NOTIFTYPE === "Alert") {
-      // Alert content with only existing JSON fields, excluding Instance ID and UID
+      // Alert content with only existing JSON fields, excluding Instance ID
       const alertData = {
         TaskTitle: data.TASK_TITLE || "",
+        UID: data.UID || "",
         TaskDetails: data.TASKDETAILS || "",
         ACTIONBUTTONS: data.ACTIONBUTTONS || "",
-        CreatedOn: data.createdOn || ""
+        CreatedOn: data.createdOn || "",
       };
 
       console.log("📋 [TRIGGER] Alert data:", JSON.stringify(alertData, null, 2));
@@ -120,13 +123,7 @@ export default async function triggerHandler(req, res, data) {
       const detailItems = details.map(detail => {
         const [label, value] = detail.split(':').map(s => s.trim());
         if (!value) return null; // Skip if no value
-       return {
-    type: "TextBlock",
-    text: `  **${label}:** ${value}`, // Bold label and left padding
-    size: "small",
-    spacing: "none",
-    wrap: true
-  };
+        return { type: "TextBlock", text: `**${label}:** ${value}`, size: "small", spacing: "small", wrap: true };
       }).filter(item => item !== null);
 
       // Create actions array - only include button if URL exists
@@ -153,21 +150,22 @@ export default async function triggerHandler(req, res, data) {
               {
                 type: "Container",
                 items: [
-                  alertData.CreatedOn ? { type: "ColumnSet", columns: [{ type: "Column", width: "auto", items: [{ type: "TextBlock", text: "Created On:", size: "small" }] }, { type: "Column", width: "stretch", items: [{ type: "TextBlock", text: formattedDate, size: "small" }] }] } : null
+                  alertData.UID ? { type: "ColumnSet", columns: [{ type: "Column", width: "auto", items: [{ type: "TextBlock", text: "UID:", size: "small" }] }, { type: "Column", width: "stretch", items: [{ type: "TextBlock", text: alertData.UID, size: "small" }] }] } : null,
+                  alertData.CreatedOn ? { type: "ColumnSet", columns: [{ type: "Column", width: "auto", items: [{ type: "TextBlock", text: "Created On:", size: "small" }] }, { type: "Column", width: "stretch", items: [{ type: "TextBlock", text: formattedDate, size: "small" }] }] } : null,
                 ].filter(item => item !== null),
                 style: "emphasis",
-                spacing: "medium"
+                spacing: "medium",
               },
               {
                 type: "Container",
-  items: [
-    { type: "TextBlock", text: "**Task Details:**", weight: "bolder", size: "medium", spacing: "medium", wrap: true },
-    ...detailItems
-  ],
-  spacing: "medium"
-              }
+                items: [
+                  { type: "TextBlock", text: "Task Details:", weight: "bolder", size: "small", spacing: "medium" },
+                  ...detailItems,
+                ],
+                spacing: "medium",
+              },
             ].filter(item => item !== null),
-            actions: actions
+            actions: actions,
           }
         }]
       };
@@ -184,8 +182,8 @@ export default async function triggerHandler(req, res, data) {
       {
         headers: {
           Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json"
-        }
+          "Content-Type": "application/json",
+        },
       }
     );
 
@@ -194,7 +192,7 @@ export default async function triggerHandler(req, res, data) {
     res.end(JSON.stringify({
       message: `Success! Workflow notification sent with ${adaptiveCardJson.attachments?.[0]?.content?.actions?.length || 0} actions`,
       instanceId,
-      actionsCount: adaptiveCardJson.attachments?.[0]?.content?.actions?.length || 0
+      actionsCount: adaptiveCardJson.attachments?.[0]?.content?.actions?.length || 0,
     }));
   } catch (error) {
     console.error("💥 [TRIGGER] Error:", error.message, error.response?.data);
@@ -213,7 +211,7 @@ async function getBotAccessToken(appId, appPassword) {
         grant_type: "client_credentials",
         client_id: appId,
         client_secret: appPassword,
-        scope: "https://api.botframework.com/.default"
+        scope: "https://api.botframework.com/.default",
       }),
       { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
     );
@@ -237,7 +235,9 @@ function createTeamsInlineCard(workflow, isLiveData = true) {
           CreatedByName: workflow.CREATED_BY_NAME,
           CreatedOn: workflow.CREATED_ON,
           InboxURL: workflow.INBOXURL,
-          AppURL: workflow.APPURL
+          AppURL: workflow.APPURL,
+          CreatedBy: workflow.CREATED_BY,
+          UID: workflow.UID
         }
       : {
           TaskTitle: workflow.TaskTitle || "Untitled Task",
@@ -247,7 +247,7 @@ function createTeamsInlineCard(workflow, isLiveData = true) {
           CreatedByName: workflow.CreatedByName || "Unknown",
           CreatedOn: workflow.CreatedOn || new Date().toISOString(),
           InboxURL: workflow.InboxURL || "#",
-          AppURL: workflow.AppURL || "#"
+          AppURL: workflow.AppURL || "#",
         };
 
     // Parse all TaskDetails fields
@@ -256,20 +256,8 @@ function createTeamsInlineCard(workflow, isLiveData = true) {
       : [];
     const detailItems = taskDetailsArray.map(detail => {
       const [label, value] = detail.split(':').map(s => s.trim());
-      if (!value) return null;
-      return { 
-        type: "TextBlock", 
-        text: `${label}: ${value}`, 
-        size: "small", 
-        spacing: "small", 
-       wrap: true,
-    // Add left margin/padding via horizontalAlignment or subtle color
-    horizontalAlignment: "left",
-    color: "default",
-    // Add leading spaces for visual left padding
-    // You can add more spaces if you want more padding
-    text: `  ${label}: ${value}` // Unicode em spaces for padding
-      };
+      if (!value) return null; // Skip if no value
+      return { type: "TextBlock", text: `${label}: ${value}`, size: "small", spacing: "small", wrap: true };
     }).filter(item => item !== null);
 
     // Parse and format the date correctly for DD.MM.YYYY format
@@ -277,6 +265,7 @@ function createTeamsInlineCard(workflow, isLiveData = true) {
     if (safeWorkflow.CreatedOn) {
       const [day, month, year] = safeWorkflow.CreatedOn.split('.');
       if (day && month && year) {
+        // Create a valid ISO date string (YYYY-MM-DD)
         const isoDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
         const date = new Date(isoDate);
         formattedDate = date.toLocaleDateString("en-US", { 
@@ -289,52 +278,12 @@ function createTeamsInlineCard(workflow, isLiveData = true) {
       formattedDate = new Date().toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" });
     }
 
-    // Combine Created By Name and Created On
-    const createdByText = safeWorkflow.CreatedByName && safeWorkflow.CreatedOn 
-      ? `Created By: ${safeWorkflow.CreatedByName} | created on ${formattedDate}`
-      : safeWorkflow.CreatedByName 
-        ? `Created By: ${safeWorkflow.CreatedByName}`
-        : safeWorkflow.CreatedOn 
-          ? `created on ${formattedDate}`
-          : "";
-
-    // Side-by-side hyperlinks as a ColumnSet
-    const linkColumnSet = (safeWorkflow.InboxURL || safeWorkflow.AppURL) ? {
-      type: "ColumnSet",
-      spacing: "medium",
-      columns: [
-        safeWorkflow.InboxURL ? {
-          type: "Column",
-          width: "auto",
-          items: [{
-            type: "TextBlock",
-            text: `[🔗 View in SAP Inbox](${safeWorkflow.InboxURL})`,
-            wrap: true,
-            color: "accent",
-            weight: "bolder",
-            size: "medium"
-          }]
-        } : null,
-        safeWorkflow.AppURL ? {
-          type: "Column",
-          width: "auto",
-          items: [{
-            type: "TextBlock",
-            text: `[🔗 Open App URL](${safeWorkflow.AppURL})`,
-            wrap: true,
-            color: "accent",
-            weight: "bolder",
-            size: "medium"
-          }]
-        } : null
-      ].filter(Boolean)
-    } : null;
-
     const cardContent = {
       type: "AdaptiveCard",
       $schema: "http://adaptivecards.io/schemas/adaptive-card.json",
       version: "1.3",
       body: [
+        // Updated header with notification icon
         { 
           type: "TextBlock", 
           text: "🔔 **New Workflow Notification**", 
@@ -342,28 +291,30 @@ function createTeamsInlineCard(workflow, isLiveData = true) {
           size: "large", 
           color: "accent" 
         },
-        { type: "TextBlock", text: safeWorkflow.TaskTitle || "", weight: "bolder", size: "medium", wrap: true, spacing: "medium" },
+        { type: "TextBlock", text: safeWorkflow.TaskTitle || "", weight: "bolder", size: "medium", wrap: "true", spacing: "medium" },
         {
           type: "Container",
           items: [
             safeWorkflow.InstanceID ? { type: "ColumnSet", columns: [{ type: "Column", width: "auto", items: [{ type: "TextBlock", text: "Instance ID:", size: "small" }] }, { type: "Column", width: "stretch", items: [{ type: "TextBlock", text: safeWorkflow.InstanceID, size: "small" }] }] } : null,
-            createdByText ? { type: "ColumnSet", columns: [{ type: "Column", width: "auto", items: [{ type: "TextBlock", text: createdByText, size: "small" }] }] } : null,
-            safeWorkflow.CreatedOn && !createdByText ? { type: "ColumnSet", columns: [{ type: "Column", width: "auto", items: [{ type: "TextBlock", text: "Created On:", size: "small" }] }, { type: "Column", width: "stretch", items: [{ type: "TextBlock", text: formattedDate, size: "small" }] }] } : null
+            safeWorkflow.CreatedByName ? { type: "ColumnSet", columns: [{ type: "Column", width: "auto", items: [{ type: "TextBlock", text: "Created By Name:", size: "small" }] }, { type: "Column", width: "stretch", items: [{ type: "TextBlock", text: safeWorkflow.CreatedByName, size: "small" }] }] } : null,
+            safeWorkflow.CreatedBy ? { type: "ColumnSet", columns: [{ type: "Column", width: "auto", items: [{ type: "TextBlock", text: "Created By:", size: "small" }] }, { type: "Column", width: "stretch", items: [{ type: "TextBlock", text: safeWorkflow.CreatedBy, size: "small" }] }] } : null,
+            safeWorkflow.UID ? { type: "ColumnSet", columns: [{ type: "Column", width: "auto", items: [{ type: "TextBlock", text: "UID:", size: "small" }] }, { type: "Column", width: "stretch", items: [{ type: "TextBlock", text: safeWorkflow.UID, size: "small" }] }] } : null,
+            safeWorkflow.CreatedOn ? { type: "ColumnSet", columns: [{ type: "Column", width: "auto", items: [{ type: "TextBlock", text: "Created On:", size: "small" }] }, { type: "Column", width: "stretch", items: [{ type: "TextBlock", text: formattedDate, size: "small" }] }] } : null,
           ].filter(item => item !== null),
           style: "emphasis",
-          spacing: "medium"
+          spacing: "medium",
         },
         {
           type: "Container",
           items: [
-            { type: "TextBlock", text: "Task Details:", weight: "bolder", size: "medium", spacing: "medium", wrap: true },
-            ...detailItems
+            { type: "TextBlock", text: "Task Details:", weight: "bolder", size: "small", spacing: "medium" },
+            ...detailItems,
           ],
-          spacing: "medium"
+          spacing: "medium",
         },
-        linkColumnSet
       ].filter(item => item !== null),
       actions: [
+        // Updated actions with icons
         { 
           type: "Action.Submit", 
           title: "✅ Approve", 
@@ -375,8 +326,18 @@ function createTeamsInlineCard(workflow, isLiveData = true) {
           title: "❌ Reject", 
           data: { action: "reject", instanceId: safeWorkflow.InstanceID }, 
           style: "destructive" 
-        }
-      ]
+        },
+        ...(safeWorkflow.InboxURL ? [{ 
+          type: "Action.OpenUrl", 
+          title: "🔗 View in SAP Inbox", 
+          url: safeWorkflow.InboxURL 
+        }] : []),
+        ...(safeWorkflow.AppURL ? [{ 
+          type: "Action.OpenUrl", 
+          title: "🔗 Open App URL", 
+          url: safeWorkflow.AppURL 
+        }] : []),
+      ].filter(action => action !== null),
     };
 
     return { type: "message", attachments: [{ contentType: "application/vnd.microsoft.card.adaptive", content: cardContent }] };
